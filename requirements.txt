@@ -4,5 +4,6 @@ scipy
 pandas
 seaborn
 scikit-learn
+statsmodels
 
 jupyterlab
