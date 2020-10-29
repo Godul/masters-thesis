@@ -11,9 +11,8 @@ from statsmodels.sandbox.regression.predstd import wls_prediction_std
 from statsmodels.formula.api import ols
 
 
-
-def get_experiments_data(experiment_name):
-    for exp_dir in sorted(glob.glob(f'../data/{experiment_name}_n*')):
+def get_experiments_data(experiment_name: str, experiments_path: str):
+    for exp_dir in sorted(glob.glob(f'{experiments_path}/{experiment_name}_n*')):
         exp_name = exp_dir.rpartition("/")[-1]
         csv_path = f'{exp_dir}/VM_runtime_app_{exp_name}.csv'
         df = pd.read_csv(csv_path, sep=',', skiprows=28)
@@ -53,17 +52,17 @@ def add_instances_n(df, instances_n=6):
     return df_r
 
 
-def get_means(experiment_name, instances_n=6):
-    for exp_name, df in get_experiments_data(experiment_name):
+def get_means(experiment_name: str, experiments_path: str, instances_n=6):
+    for exp_name, df in get_experiments_data(experiment_name, experiments_path):
         df = df.get(['time', 'ai_name', 'app_throughput', 'app_latency'])
         df_means = calc_means(df, instances_n=instances_n)
         yield exp_name, df_means
 
         
-def get_means_merged(experiment_name, instances_n=6):
+def get_means_merged(experiment_name: str, experiments_path: str, instances_n=6):
     res = pd.DataFrame(columns=['instances_n', 'app_throughput', 'app_latency'])
     
-    for exp_name, df in get_experiments_data(experiment_name):
+    for exp_name, df in get_experiments_data(experiment_name, experiments_path):
         df = df.get(['time', 'ai_name', 'app_throughput', 'app_latency'])
         df_means = calc_means(df)
         res = res.append(df_means)
@@ -113,8 +112,8 @@ def get_means_from_interval(df, a, b):
     return df_t.mean()
 
 
-def get_means_with_cpu(experiment_name, instances_n=6):
-    for exp_dir in sorted(glob.glob(f'../data/{experiment_name}_n*')):
+def get_means_with_cpu(experiment_name: str, experiments_path: str, instances_n=6):
+    for exp_dir in sorted(glob.glob(f'{experiments_path}/{experiment_name}_n*')):
         # cbtool data
         exp_name = exp_dir.rpartition("/")[-1]
         csv_path = f'{exp_dir}/VM_runtime_app_{exp_name}.csv'
@@ -153,8 +152,8 @@ def convert_from_padded(padded_str: str):
     return int(str(padded_str)[:10])
 
 
-def get_data_with_metrics(experiment_name, instances_n=6, max_time_diff=5):
-    for exp_dir in sorted(glob.glob(f'../data/{experiment_name}_n*')):
+def get_data_with_metrics(experiment_name: str, experiments_path: str, instances_n=6, max_time_diff=5):
+    for exp_dir in sorted(glob.glob(f'{experiments_path}/{experiment_name}_n*')):
         # cbtool data
         exp_name = exp_dir.rpartition("/")[-1]
         csv_path = f'{exp_dir}/VM_runtime_app_{exp_name}.csv'
