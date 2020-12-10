@@ -2,6 +2,8 @@
 
 Repository for the work connected to my master's thesis.
 
+Most interesting things are [here](notebooks/new_experiments).
+
 ## Usage
 To browse and run Jupyter Notebooks:
 
