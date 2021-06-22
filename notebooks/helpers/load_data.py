@@ -2,7 +2,10 @@ from bisect import (
     bisect_left,
     bisect_right,
 )
-from datetime import datetime
+from datetime import (
+    datetime,
+    timedelta,
+)
 import glob
 from itertools import chain
 import re
@@ -12,7 +15,7 @@ import pandas as pd
 
 
 def get_experiments_paths(experiment_name: str, experiments_path: str):
-    yield from sorted(glob.glob(f'{experiments_path}/{experiment_name}_m*'))
+    return list(sorted(glob.glob(f'{experiments_path}/{experiment_name}_m*')))
 
 
 def convert_from_time_str(time_str: str):
@@ -21,8 +24,9 @@ def convert_from_time_str(time_str: str):
 
 
 def convert_from_padded(padded_str: str):
+    "Convert timestamp from weird padded format in our .csv"
     return int(str(padded_str)[:10])
-    
+
 
 def get_attach_indexes(df: pd.DataFrame, instances_n: int):
     res = []
@@ -32,7 +36,7 @@ def get_attach_indexes(df: pd.DataFrame, instances_n: int):
     res.append(len(df))
     return res
 
-    
+
 def add_instances_n_old(df: pd.DataFrame, instances_n: int):
     df_r = df.copy()
     attach_indexes = get_attach_indexes(df, instances_n=instances_n)
@@ -80,6 +84,7 @@ def get_cbtool_data(experiment_path: str, instances_n: int):
     df = add_instances_n(df, instances_n=instances_n)
     df = df[df['ai_name'] == 'ai_1']
     df['app_throughput_inv'] = 1. / df['app_throughput']
+    df['instances_n'] = df['instances_n'].astype(int)
     return df
 
 
@@ -209,8 +214,9 @@ def merge_dataframes(df_cbt: pd.DataFrame, df_cpu: pd.DataFrame, df_mem: pd.Data
             cpu,
             mem,
             cbt_row['instances_n'],
+            cbt_row['app_completion_time']
         ] + list(os_row[1:]))
-    return pd.DataFrame(res, columns=(['cbtool_time', 'app_latency', 'app_throughput', 'app_throughput_inv', 'cpu', 'memory', 'instances_n'] + list(df_os.columns[1:])))
+    return pd.DataFrame(res, columns=(['cbtool_time', 'app_latency', 'app_throughput', 'app_throughput_inv', 'cpu', 'memory', 'instances_n', 'app_completion_time'] + list(df_os.columns[1:])))
 
 
 def merge_dataframes_cpu(df_cbt: pd.DataFrame, df_cpu: pd.DataFrame, df_mem: pd.DataFrame, cpu_window: int):
@@ -232,8 +238,9 @@ def merge_dataframes_cpu(df_cbt: pd.DataFrame, df_cpu: pd.DataFrame, df_mem: pd.
             cpu,
             mem,
             cbt_row['instances_n'],
+            cbt_row['app_completion_time'],
         ])
-    return pd.DataFrame(res, columns=(['cbtool_time', 'app_latency', 'app_throughput', 'app_throughput_inv', 'cpu', 'memory', 'instances_n']))
+    return pd.DataFrame(res, columns=(['cbtool_time', 'app_latency', 'app_throughput', 'app_throughput_inv', 'cpu', 'memory', 'instances_n', 'app_completion_time']))
 
 
 def get_data_with_metrics_old(experiment_path: str, instances_n: int, max_time_diff=5):
@@ -257,7 +264,43 @@ def get_data_with_cpu(experiment_path: str, instances_n: int, cpu_window=30):
     df_cpu = get_cpu_data(experiment_path)
     df_mem = get_mem_data(experiment_path)
     return merge_dataframes_cpu(df_cbt, df_cpu, df_mem, cpu_window=cpu_window)
-    
+
 
 def trim_experiment(df: pd. DataFrame, max_instances_n: int):
     return df[df['instances_n'] <= max_instances_n]
+
+
+
+def extract_datetime_from_log(line: str, year=2020):
+    """Take one log line from CBTOOL log and extract the datetime.
+    
+    Function supports logs from root_operations.log.
+    It is neceessary to provide the year, as the logs do not contain it.
+    """
+    month, day, t = line.split()[:3]
+    return datetime.strptime(f'{year} {month} {day} {t}', '%Y %b %d %H:%M:%S')
+
+
+def get_setup_intervals(path: str, year=2020):
+    """Parse the logs and get datetime intervals for setting up phase of each load."""
+    LEFT_END_PHRASE = 'AI object initialization success'
+    RIGHT_END_PHRASE = 'It is ssh-accessible at the IP address'
+    left_ends = []
+    right_ends = []
+    
+    with open(path + '/root_operations.log') as file:
+        for line in file:
+            if LEFT_END_PHRASE in line:
+                left_ends.append(extract_datetime_from_log(line, year=year))
+            if RIGHT_END_PHRASE in line:
+                right_ends.append(extract_datetime_from_log(line, year=year))
+    return list(zip(left_ends[1:], right_ends[2:]))
+
+
+def remove_setup_datapoints(df: pd.DataFrame, path: str, year=2020):
+    """Remove datapoints that are influenced by setup phase of deployed workloads."""
+    completion_time = int(df['app_completion_time'].max())
+    
+    for left, right in get_setup_intervals(path, year=year):
+        df = df[(df['time'] < left) | (right + timedelta(seconds=completion_time) < df['time'])]
+    return df

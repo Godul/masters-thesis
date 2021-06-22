@@ -50,12 +50,17 @@ def draw_regression_graph(results, df, metric_name='app_latency', variable='inst
     ax.legend(loc='best')
 
 
-def boxplot_two(var_1: str, var_2: str, df: pd.DataFrame, figsize: Tuple[int, int], title: str):
+def boxplot_two(var_1: str, var_2: str, df: pd.DataFrame, figsize: Tuple[int, int], title: str, ylab_1='', ylab_2=''):
     fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=False, sharey=False, figsize=figsize)
     ax1 = sns.boxplot(x='instances_n', y=var_1, data=df, ax=ax1, color='yellowgreen')
     if title:
         ax1.set_title(title)
+    if ylab_1:
+        ax1.set_ylabel(ylab_1)
+    
     sns.boxplot(x='instances_n', y=var_2, data=df, ax=ax2, color='tomato')
+    if ylab_2:
+        ax2.set_ylabel(ylab_2)    
 
 
 def boxplot_grid(var_names: List[List[str]], dfs: List[List[pd.DataFrame]], figsize: Tuple[int, int], titles: List[List[str]], ylabels: List[List[str]], suptitle: str=None):
